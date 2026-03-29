@@ -1,56 +1,96 @@
-# 📓 To-Do List React Native App
+# To-Do List
+
+A cross-platform task management app built with React Native and Expo. The current app is local-first, stores data on the device with AsyncStorage, and focuses on quick capture, lightweight scheduling, and focused work sessions.
 
 > **Note:** 🎓 This app is part of a Nile University course funded by 🏦 Bank Misr to apply on state management and APIs.
 
-A premium, cross-platform To-Do List application built with React Native and Expo. It features a custom "Editorial Nocturne" design system, real-time state management, and a simulated backend.
+## Highlights
 
-## ✨ Features
+- ✍️ Smart task creation with both quick add and a full editor for richer task details
+- 🗂️ Flexible organization using categories, priorities, and completion states
+- 📅 Built-in scheduling with due dates, start times, and planned session durations
+- 🔎 Fast search across titles, notes, tags, priority, focus mode, and schedule data
+- 🎯 Focus Mode timer to turn planned work blocks into distraction-free sessions
+- 📊 Weekly progress tracking to visualize momentum and completed goals
+- 🌗 Theme switching with saved light and dark mode preferences
+- 💾 Local-first experience powered by AsyncStorage for persistent on-device data
 
-- **✅ Task Management:** Create, edit, toggle completion, and delete tasks.
-- **🎨 Premium Design System:** Implements the sleek "Editorial Nocturne" theme with custom typography (Manrope & Inter) and smooth animations.
-- **🏷️ Categorization & Priority:** Tag tasks by category and highlight high-priority tasks with sleek linear gradients.
-- **📊 Progress Tracking:** Visualize your daily/weekly momentum with a dynamic progress indicator in the sidebar panel.
-- **🧠 State Management:** Utilizes Redux Toolkit for robust, scalable, and predictable state handling.
-- **🌐 Simulated API:** Uses `json-server` for a fully functional REST API backend.
+## Tech Stack
 
-## 🛠️ Tech Stack
+- Expo 54
+- React Native 0.81
+- React 19
+- TypeScript
+- Expo Router
+- Redux Toolkit + React Redux
+- AsyncStorage
+- Expo Linear Gradient
+- Expo Google Fonts
 
-- **📱 Framework:** [React Native](https://reactnative.dev) / [Expo](https://expo.dev)
-- **💎 Architecture:** MVVM-inspired component separation
-- **🧠 State Management:** [Redux Toolkit](https://redux-toolkit.js.org/) (`react-redux`)
-- **ʦ Language:** TypeScript
-- **🎨 UI & Styling:** Custom Theme Hooks + `expo-linear-gradient`
-- **🗄️ Backend:** `json-server` (Mock REST API)
+## How It Works
 
-## 🚀 Getting Started
+The app entry point is [`app/index.tsx`](/c:/Users/Eslam/StudioProjects/to_do_list/app/index.tsx). State is managed in [`store/tasksSlice.ts`](/c:/Users/Eslam/StudioProjects/to_do_list/store/tasksSlice.ts) and persisted locally with AsyncStorage, so no backend is required to run the current version.
 
-### 1. 📦 Install Dependencies
+Each task supports:
+
+- title and description
+- category tag
+- priority level
+- due date
+- start time
+- estimated duration in minutes
+- optional focus mode session
+
+## Getting Started
+
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. 🗄️ Start the Backend API
-
-The application requires the local JSON API to be running on port 3001. Open a new terminal and run:
+### 2. Start the app
 
 ```bash
-npx json-server --watch db.json --port 3001 --host 0.0.0.0
+npm start
 ```
 
-> **Important Device Note:** If you are testing on a physical iOS/Android device via Expo Go, you must update the `API_URL` in `store/tasksSlice.ts` from `localhost` / `10.0.2.2` to your computer's local Wi-Fi IP address (e.g., `http://192.168.1.5:3001`).
-
-### 3. 📱 Start the App
+You can also use the platform-specific scripts:
 
 ```bash
-npx expo start --clear
+npm run android
+npm run ios
+npm run web
 ```
 
-In the terminal output, you'll find options to open the app:
-- Press **a** to open on an [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- Press **i** to open on an [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- Scan the QR code with [Expo Go](https://expo.dev/go) on your real device.
+## Available Scripts
 
----
+```bash
+npm start
+npm run android
+npm run ios
+npm run web
+npm run lint
+```
 
-Built with ❤️ for Nile University & Bank Misr.
+## Project Structure
+
+```text
+app/                Expo Router screens and app shell
+components/         Reusable UI such as task cards, modals, sidebar, and progress bar
+store/              Redux store setup and task state
+providers/          Theme provider and app-wide context
+utils/              Scheduling and search helpers
+constants/          Design tokens and theme definitions
+assets/             Icons and image assets
+```
+
+## Notes
+
+- Tasks are stored locally on the device or simulator.
+- The current implementation does not require `json-server` or any external API.
+- Theme preference is also persisted locally.
+
+## License
+
+This project does not currently include a license file.
