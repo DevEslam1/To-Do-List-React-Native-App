@@ -1,18 +1,31 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Task } from '../store/tasksSlice';
-import { Colors, Typography, Spacing, Radii, Fonts } from '../constants/theme';
+import { Fonts, Radii, ThemeColors, Typography } from '../constants/theme';
+import { useAppTheme } from '../providers/theme-provider';
+import { formatDuration, formatStartTime, formatTaskDate } from '../utils/taskSchedule';
 
 interface TaskItemProps {
   task: Task;
+  index?: number;
   onToggle: (task: Task) => void;
   onPress: (task: Task) => void;
   onDelete: (task: Task) => void;
+  onStartFocus: (task: Task) => void;
 }
 
-export default function TaskItem({ task, onToggle, onPress, onDelete }: TaskItemProps) {
+export default function TaskItem({
+  task,
+  index,
+  onToggle,
+  onPress,
+  onDelete,
+  onStartFocus,
+}: TaskItemProps) {
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
+
   return (
     <Pressable
       style={({ pressed }) => [
@@ -22,127 +35,216 @@ export default function TaskItem({ task, onToggle, onPress, onDelete }: TaskItem
       ]}
       onPress={() => onPress(task)}
     >
+      {index !== undefined ? <Text style={styles.listIndexNumber}>{index}</Text> : null}
+
       <Pressable
         style={[styles.checkbox, task.completed && styles.checkboxCompleted]}
-        onPress={() => onToggle(task)}
         hitSlop={10}
+        onPress={(event) => {
+          event.stopPropagation();
+          onToggle(task);
+        }}
       >
-        {task.completed && (
-          <MaterialIcons name="check" size={16} color={Colors.dark.onPrimary} />
-        )}
+        {task.completed ? (
+          <MaterialIcons name="check" size={20} color={colors.onPrimary} />
+        ) : null}
       </Pressable>
 
       <View style={styles.content}>
-        <Text style={[styles.title, task.completed && styles.titleCompleted]}>
+        <Text style={[styles.title, task.completed && styles.titleCompleted]} numberOfLines={3}>
           {task.title}
         </Text>
-        {task.description ? (
-          <Text style={styles.description} numberOfLines={2}>
-            {task.description}
-          </Text>
-        ) : null}
-        
-        <View style={styles.metaContainer}>
-          <View style={[styles.badge, { backgroundColor: Colors.dark.surfaceContainerHigh }]}>
-            <Text style={[styles.badgeText, { color: Colors.dark.primary }]}>{task.tag}</Text>
+
+        <View style={styles.scheduleRow}>
+          <View style={styles.metaRow}>
+            <MaterialIcons name="event" size={14} color={colors.onSurfaceVariant} />
+            <Text style={styles.metaText}>{formatTaskDate(task.dueDate)}</Text>
           </View>
-          {task.priority === 'high' && (
-            <LinearGradient
-              colors={[Colors.dark.tertiary + '30', Colors.dark.tertiary + '10']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.badge}
+          <View style={styles.metaRow}>
+            <MaterialIcons name="schedule" size={14} color={colors.onSurfaceVariant} />
+            <Text style={styles.metaText}>{formatStartTime(task.startTime)}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <MaterialIcons name="timer" size={14} color={colors.onSurfaceVariant} />
+            <Text style={styles.metaText}>{formatDuration(task.durationMinutes)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.metaContainer}>
+          <View style={styles.tagChip}>
+            <Text style={styles.tagChipText}>{task.tag.toUpperCase()}</Text>
+          </View>
+
+          {task.priority === 'high' ? (
+            <View style={styles.priorityChip}>
+              <MaterialIcons name="flag" size={12} color={colors.tertiary} />
+              <Text style={styles.priorityChipText}>High Priority</Text>
+            </View>
+          ) : null}
+
+          {task.focusModeEnabled && !task.completed ? (
+            <Pressable
+              style={styles.focusChip}
+              onPress={(event) => {
+                event.stopPropagation();
+                onStartFocus(task);
+              }}
             >
-              <Text style={[styles.badgeText, { color: Colors.dark.tertiary }]}>High Priority</Text>
-            </LinearGradient>
-          )}
+              <MaterialIcons name="center-focus-strong" size={14} color={colors.onPrimary} />
+              <Text style={styles.focusChipText}>Focus</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
-      {/* Delete button */}
       <Pressable
-        onPress={() => onDelete(task)}
         hitSlop={8}
+        onPress={(event) => {
+          event.stopPropagation();
+          onDelete(task);
+        }}
         style={styles.deleteBtn}
       >
-        <MaterialIcons name="delete-outline" size={20} color={Colors.dark.onSurfaceVariant} />
+        <MaterialIcons name="close" size={16} color={colors.onSurfaceVariant} />
       </Pressable>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    padding: Spacing.lg,
-    backgroundColor: Colors.dark.surfaceContainer,
-    borderRadius: Radii.xl,
-    marginBottom: Spacing.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.dark.outlineVariant + '20',
-  },
-  containerPressed: {
-    backgroundColor: Colors.dark.surfaceContainerHighest,
-    transform: [{ scale: 0.98 }],
-  },
-  containerCompleted: {
-    opacity: 0.6,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: Radii.pill,
-    borderWidth: 2,
-    borderColor: Colors.dark.outlineVariant,
-    marginRight: Spacing.md,
-    marginTop: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxCompleted: {
-    backgroundColor: Colors.dark.primary,
-    borderColor: Colors.dark.primary,
-  },
-  content: {
-    flex: 1,
-  },
-  title: {
-    fontFamily: Typography.body,
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.dark.onSurface,
-    marginBottom: 4,
-  },
-  titleCompleted: {
-    color: Colors.dark.onSurfaceVariant,
-    textDecorationLine: 'line-through',
-  },
-  description: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    color: Colors.dark.onSurfaceVariant,
-    lineHeight: 18,
-    marginBottom: Spacing.md,
-  },
-  metaContainer: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  badge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: Radii.pill,
-  },
-  deleteBtn: {
-    padding: 6,
-    marginLeft: Spacing.sm,
-    opacity: 0.5,
-  },
-  badgeText: {
-    fontFamily: Fonts.label,
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-});
+const createStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    container: {
+      position: 'relative',
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingLeft: 8,
+      paddingRight: 8,
+      paddingTop: 22,
+      paddingBottom: 26,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.listDivider,
+    },
+    containerPressed: {
+      backgroundColor: colors.surfaceContainerHigh,
+    },
+    containerCompleted: {
+      opacity: 0.55,
+    },
+    listIndexNumber: {
+      position: 'absolute',
+      right: 0,
+      top: 22,
+      fontFamily: Fonts.headline,
+      fontSize: 50,
+      fontWeight: '800',
+      lineHeight: 54,
+      color: colors.onSurface,
+      opacity: isDark ? 0.06 : 0.08,
+    },
+    checkbox: {
+      width: 36,
+      height: 36,
+      borderRadius: Radii.pill,
+      borderWidth: 2,
+      borderColor: colors.checkboxBorder,
+      backgroundColor: colors.checkboxFill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 2,
+      marginRight: 18,
+    },
+    checkboxCompleted: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    content: {
+      flex: 1,
+      paddingRight: 44,
+    },
+    title: {
+      fontFamily: Typography.headline,
+      fontSize: 19,
+      lineHeight: 31,
+      color: colors.onSurface,
+      letterSpacing: -0.7,
+    },
+    titleCompleted: {
+      color: colors.onSurfaceVariant,
+      textDecorationLine: 'line-through',
+    },
+    scheduleRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginTop: 10,
+    },
+    metaContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 10,
+      marginTop: 10,
+    },
+    tagChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: Radii.pill,
+      backgroundColor: colors.tagChipBackground,
+    },
+    tagChipText: {
+      fontFamily: Fonts.label,
+      fontSize: 11,
+      letterSpacing: 1.2,
+      color: colors.primary,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    metaText: {
+      fontFamily: Typography.body,
+      fontSize: 14,
+      color: colors.onSurfaceVariant,
+    },
+    priorityChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: Radii.pill,
+      backgroundColor: colors.dangerSoft,
+    },
+    priorityChipText: {
+      fontFamily: Typography.body,
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.tertiary,
+    },
+    focusChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: Radii.pill,
+      backgroundColor: colors.primary,
+    },
+    focusChipText: {
+      fontFamily: Typography.body,
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.onPrimary,
+    },
+    deleteBtn: {
+      position: 'absolute',
+      right: 0,
+      bottom: 24,
+      width: 22,
+      height: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      opacity: isDark ? 0.25 : 0.35,
+    },
+  });

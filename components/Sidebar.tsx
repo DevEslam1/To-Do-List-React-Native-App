@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Dimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setFilter, TasksState } from '../store/tasksSlice';
-import ProgressBar from './ProgressBar';
-import { Colors, Typography, Spacing, Radii } from '../constants/theme';
+import { Radii, Spacing, ThemeColors, Typography } from '../constants/theme';
+import { useAppTheme } from '../providers/theme-provider';
 
 const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = Math.min(width * 0.8, 320);
@@ -16,12 +16,14 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const dispatch = useAppDispatch();
+  const { colors, isDark, theme, toggleTheme } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const filter = useAppSelector((state) => state.tasks.filter);
   const tasks = useAppSelector((state) => state.tasks.items);
 
-  const translateX = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
-  const overlayOpacity = React.useRef(new Animated.Value(0)).current;
-  const [isAnimating, setIsAnimating] = React.useState(false);
+  const translateX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -29,192 +31,243 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       Animated.parallel([
         Animated.timing(translateX, {
           toValue: 0,
-          duration: 300,
+          duration: 280,
           useNativeDriver: true,
         }),
         Animated.timing(overlayOpacity, {
           toValue: 1,
-          duration: 300,
+          duration: 280,
           useNativeDriver: true,
         }),
       ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(translateX, {
-          toValue: -SIDEBAR_WIDTH,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(overlayOpacity, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setIsAnimating(false);
-      });
+      return;
     }
-  }, [isOpen]);
 
-  const handleNav = (newFilter: TasksState['filter']) => {
-    dispatch(setFilter(newFilter));
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: -SIDEBAR_WIDTH,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setIsAnimating(false));
+  }, [isOpen, overlayOpacity, translateX]);
+
+  const handleNav = (nextFilter: TasksState['filter']) => {
+    dispatch(setFilter(nextFilter));
     onClose();
   };
 
-  const navItems: Array<{ icon: keyof typeof MaterialIcons.glyphMap; label: string; id: TasksState['filter'] }> = [
-    { icon: 'today', label: 'Today', id: 'today' },
+  const remainingCount = tasks.filter((task) => !task.completed).length;
+
+  const navItems: {
+    icon: keyof typeof MaterialIcons.glyphMap;
+    label: string;
+    id: TasksState['filter'];
+  }[] = [
+    { icon: 'wb-sunny', label: 'Today', id: 'today' },
     { icon: 'inbox', label: 'Inbox', id: 'inbox' },
-    { icon: 'folder-open', label: 'Projects', id: 'projects' },
+    { icon: 'category', label: 'Tags', id: 'projects' },
     { icon: 'check-circle-outline', label: 'Completed', id: 'completed' },
   ];
 
-  const completeCount = tasks.filter(t => t.completed).length;
-  const progressRatio = tasks.length > 0 ? completeCount / tasks.length : 0;
-  
   if (!isOpen && !isAnimating) {
-    return null; 
+    return null;
   }
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents={isOpen ? 'auto' : 'none'}>
-      {/* Background Overlay */}
       <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      {/* Sidebar Panel */}
       <Animated.View style={[styles.panel, { transform: [{ translateX }] }]}>
         <View style={styles.header}>
-          <Text style={styles.title}>Editorial Nocturne</Text>
-          <Text style={styles.subtitle}>PERSONAL WORKSPACE</Text>
+          <Text style={styles.title}>Task Log</Text>
+          <Text style={styles.subtitle}>{remainingCount} active tasks in your workspace</Text>
         </View>
 
         <View style={styles.nav}>
           {navItems.map((item) => {
-            const isActive = filter === item.id;
+            const active = filter === item.id;
             return (
               <Pressable
                 key={item.id}
+                style={[styles.navItem, active && styles.navItemActive]}
                 onPress={() => handleNav(item.id)}
-                style={[styles.navItem, isActive && styles.navItemActive]}
               >
                 <MaterialIcons
                   name={item.icon}
-                  size={24}
-                  color={isActive ? Colors.dark.onSecondaryContainer : Colors.dark.onSurfaceVariant}
+                  size={22}
+                  color={active ? colors.onPrimary : colors.onSurfaceVariant}
                 />
-                <Text style={[styles.navItemText, isActive && styles.navItemTextActive]}>
-                  {item.label}
-                </Text>
+                <Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text>
               </Pressable>
             );
           })}
         </View>
 
-        {/* Weekly Focus */}
-        <View style={styles.momentumCard}>
-          <Text style={styles.momentumTitle}>Weekly Focus</Text>
-          <Text style={styles.momentumDesc}>
-            You've completed {Math.round(progressRatio * 100)}% of your tasks this week. Keep the momentum.
+        <Pressable style={styles.themeToggle} onPress={() => void toggleTheme()}>
+          <View style={styles.themeToggleLeft}>
+            <MaterialIcons
+              name={theme === 'dark' ? 'light-mode' : 'dark-mode'}
+              size={22}
+              color={colors.primary}
+            />
+            <Text style={styles.themeToggleText}>
+              Switch to {theme === 'dark' ? 'light' : 'dark'} mode
+            </Text>
+          </View>
+          <Text style={styles.themeBadge}>{theme.toUpperCase()}</Text>
+        </Pressable>
+
+        <View style={styles.footerCard}>
+          <Text style={styles.footerLabel}>Workspace</Text>
+          <Text style={styles.footerValue}>
+            {tasks.length} tasks tracked, {remainingCount} still in motion.
           </Text>
-          <ProgressBar progress={progressRatio} />
         </View>
 
-        <View style={styles.spacer} />
-
-        <Pressable style={styles.navItem} onPress={() => {}}>
-          <MaterialIcons name="settings" size={24} color={Colors.dark.onSurfaceVariant} />
-          <Text style={styles.navItemText}>Settings</Text>
+        <Pressable style={styles.settingsRow} onPress={onClose}>
+          <MaterialIcons name="close" size={22} color={colors.onSurfaceVariant} />
+          <Text style={styles.settingsText}>Close panel</Text>
         </Pressable>
       </Animated.View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    zIndex: 10,
-  },
-  panel: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: SIDEBAR_WIDTH,
-    backgroundColor: Colors.dark.surfaceContainerLow,
-    borderRightWidth: 1,
-    borderRightColor: Colors.dark.outlineVariant + '40', // 25% opacity
-    padding: Spacing.xl,
-    paddingTop: 60, // accommodate safe area
-    zIndex: 20,
-    flexDirection: 'column',
-  },
-  header: {
-    marginBottom: Spacing.xxl,
-  },
-  title: {
-    fontFamily: Typography.headline,
-    fontWeight: '700',
-    fontSize: 20,
-    color: Colors.dark.onSurface,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontFamily: Typography.body,
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 1,
-    color: Colors.dark.onSurfaceVariant,
-  },
-  nav: {
-    gap: Spacing.sm,
-  },
-  navItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radii.pill,
-    gap: Spacing.md,
-  },
-  navItemActive: {
-    backgroundColor: Colors.dark.secondaryContainer,
-  },
-  navItemText: {
-    fontFamily: Typography.body,
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.dark.onSurfaceVariant,
-  },
-  navItemTextActive: {
-    color: Colors.dark.onSecondaryContainer,
-  },
-  momentumCard: {
-    marginTop: 'auto',
-    marginBottom: Spacing.xl,
-    padding: Spacing.lg,
-    backgroundColor: Colors.dark.surfaceContainer,
-    borderRadius: Radii.xl,
-  },
-  momentumTitle: {
-    fontFamily: Typography.body,
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.dark.onSurface,
-    marginBottom: Spacing.sm,
-  },
-  momentumDesc: {
-    fontFamily: Typography.body,
-    fontSize: 12,
-    color: Colors.dark.onSurfaceVariant,
-    lineHeight: 18,
-    marginBottom: Spacing.lg,
-  },
-  spacer: {
-    height: 1,
-    backgroundColor: Colors.dark.outlineVariant + '40',
-    marginVertical: Spacing.md,
-  },
-});
+const createStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlay,
+    },
+    panel: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      width: SIDEBAR_WIDTH,
+      paddingHorizontal: Spacing.xl,
+      paddingTop: 64,
+      paddingBottom: Spacing.xl,
+      backgroundColor: colors.surfaceContainerLow,
+      borderRightWidth: 1,
+      borderRightColor: colors.outlineVariant,
+    },
+    header: {
+      marginBottom: Spacing.xxl,
+    },
+    title: {
+      fontFamily: Typography.headline,
+      fontSize: 28,
+      color: colors.primary,
+      marginBottom: Spacing.xs,
+    },
+    subtitle: {
+      fontFamily: Typography.body,
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.onSurfaceVariant,
+    },
+    nav: {
+      gap: Spacing.sm,
+    },
+    navItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.md,
+      borderRadius: Radii.pill,
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: isDark ? 0 : 1,
+      borderColor: colors.outlineVariant,
+    },
+    navItemActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    navText: {
+      fontFamily: Typography.body,
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.onSurfaceVariant,
+    },
+    navTextActive: {
+      color: colors.onPrimary,
+    },
+    themeToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: Spacing.xl,
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.md,
+      borderRadius: Radii.xl,
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      gap: Spacing.md,
+    },
+    themeToggleLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+      flex: 1,
+    },
+    themeToggleText: {
+      fontFamily: Typography.body,
+      fontSize: 14,
+      color: colors.onSurface,
+      flex: 1,
+    },
+    themeBadge: {
+      fontFamily: Typography.body,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.8,
+      color: colors.primary,
+    },
+    footerCard: {
+      marginTop: 'auto',
+      padding: Spacing.lg,
+      borderRadius: Radii.xl,
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    footerLabel: {
+      fontFamily: Typography.body,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+      color: colors.primary,
+      marginBottom: Spacing.sm,
+    },
+    footerValue: {
+      fontFamily: Typography.body,
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.onSurfaceVariant,
+    },
+    settingsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+      marginTop: Spacing.lg,
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: Spacing.sm,
+    },
+    settingsText: {
+      fontFamily: Typography.body,
+      fontSize: 14,
+      color: colors.onSurfaceVariant,
+    },
+  });

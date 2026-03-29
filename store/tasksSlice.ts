@@ -1,79 +1,117 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import {
+  buildDefaultSchedule,
+  normalizeDateKey,
+  normalizeDurationMinutes,
+  normalizeTimeValue,
+} from '../utils/taskSchedule';
 
 export interface Task {
   id: string;
   title: string;
   description: string;
   completed: boolean;
-  priority: "low" | "normal" | "high";
+  priority: 'low' | 'normal' | 'high';
   tag: string;
   dueDate: string;
+  startTime: string;
+  durationMinutes: number;
+  focusModeEnabled: boolean;
 }
 
 export interface TasksState {
   items: Task[];
-  status: "idle" | "loading" | "succeeded" | "failed";
+  status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
-  filter: "today" | "inbox" | "completed" | "projects";
+  filter: 'today' | 'inbox' | 'completed' | 'projects';
   saving: boolean;
   deleting: string | null;
 }
 
 const initialState: TasksState = {
   items: [],
-  status: "idle",
+  status: 'idle',
   error: null,
-  filter: "today",
+  filter: 'today',
   saving: false,
   deleting: null,
 };
 
-const TASKS_STORAGE_KEY = "@tasks_data";
+const TASKS_STORAGE_KEY = '@tasks_data';
 
-// Helper to save to AsyncStorage
+const normalizeTask = (task: Partial<Task>): Task => {
+  const scheduleDefaults = buildDefaultSchedule();
+  const priority = task.priority === 'low' || task.priority === 'high' ? task.priority : 'normal';
+
+  return {
+    id: String(task.id ?? Math.random().toString(36).slice(2, 11)),
+    title: typeof task.title === 'string' ? task.title : '',
+    description: typeof task.description === 'string' ? task.description : '',
+    completed: Boolean(task.completed),
+    priority,
+    tag: typeof task.tag === 'string' && task.tag.trim() ? task.tag : 'Work',
+    dueDate: normalizeDateKey(task.dueDate, scheduleDefaults.dueDate),
+    startTime: normalizeTimeValue(task.startTime, scheduleDefaults.startTime),
+    durationMinutes: normalizeDurationMinutes(
+      task.durationMinutes,
+      scheduleDefaults.durationMinutes
+    ),
+    focusModeEnabled: Boolean(task.focusModeEnabled),
+  };
+};
+
 const saveTasksToStorage = async (tasks: Task[]) => {
   await AsyncStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
 };
 
-export const fetchTasks = createAsyncThunk<
-  Task[],
-  void,
-  { rejectValue: string }
->("tasks/fetchTasks", async (_, { rejectWithValue }) => {
-  try {
-    const storedTasks = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
-    if (!storedTasks) return [];
-
+export const fetchTasks = createAsyncThunk<Task[], void, { rejectValue: string }>(
+  'tasks/fetchTasks',
+  async (_, { rejectWithValue }) => {
     try {
-      return JSON.parse(storedTasks);
-    } catch (e) {
-      console.error("Failed to parse tasks JSON from storage:", e);
-      // If data is corrupted, wipe it and return empty array
-      await AsyncStorage.removeItem(TASKS_STORAGE_KEY);
-      return [];
+      const storedTasks = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
+      if (!storedTasks) {
+        return [];
+      }
+
+      try {
+        const parsedTasks = JSON.parse(storedTasks) as Partial<Task>[];
+        const normalizedTasks = Array.isArray(parsedTasks)
+          ? parsedTasks.map((task) => normalizeTask(task))
+          : [];
+
+        if (JSON.stringify(parsedTasks) !== JSON.stringify(normalizedTasks)) {
+          await saveTasksToStorage(normalizedTasks);
+        }
+
+        return normalizedTasks;
+      } catch (error) {
+        console.error('Failed to parse tasks JSON from storage:', error);
+        await AsyncStorage.removeItem(TASKS_STORAGE_KEY);
+        return [];
+      }
+    } catch (error: any) {
+      console.error('AsyncStorage read error:', error);
+      return rejectWithValue('Failed to load tasks from internal storage.');
     }
-  } catch (err: any) {
-    console.error("AsyncStorage read error:", err);
-    return rejectWithValue("Failed to load tasks from internal storage.");
   }
-});
+);
 
 export const addTask = createAsyncThunk<
   Task,
-  Omit<Task, "id">,
+  Omit<Task, 'id'>,
   { rejectValue: string; state: { tasks: TasksState } }
->("tasks/addTask", async (task, { getState, rejectWithValue }) => {
+>('tasks/addTask', async (task, { getState, rejectWithValue }) => {
   try {
-    const newTask: Task = {
+    const newTask = normalizeTask({
       ...task,
-      id: Math.random().toString(36).substr(2, 9),
-    };
+      id: Math.random().toString(36).slice(2, 11),
+    });
     const currentTasks = getState().tasks.items;
     await saveTasksToStorage([...currentTasks, newTask]);
     return newTask;
-  } catch (err: any) {
-    return rejectWithValue("Failed to self task locally.");
+  } catch (error: any) {
+    return rejectWithValue('Failed to save task locally.');
   }
 });
 
@@ -81,14 +119,17 @@ export const updateTask = createAsyncThunk<
   Task,
   Task,
   { rejectValue: string; state: { tasks: TasksState } }
->("tasks/updateTask", async (task, { getState, rejectWithValue }) => {
+>('tasks/updateTask', async (task, { getState, rejectWithValue }) => {
   try {
+    const normalizedTask = normalizeTask(task);
     const currentTasks = getState().tasks.items;
-    const updatedTasks = currentTasks.map((t) => (t.id === task.id ? task : t));
+    const updatedTasks = currentTasks.map((currentTask) =>
+      currentTask.id === normalizedTask.id ? normalizedTask : currentTask
+    );
     await saveTasksToStorage(updatedTasks);
-    return task;
-  } catch (err: any) {
-    return rejectWithValue("Failed to update task locally.");
+    return normalizedTask;
+  } catch (error: any) {
+    return rejectWithValue('Failed to update task locally.');
   }
 });
 
@@ -99,12 +140,13 @@ export const toggleTaskCompletion = createAsyncThunk<
     rejectValue: { id: string; originalTask: Task };
     state: { tasks: TasksState };
   }
->("tasks/toggleTaskCompletion", async (task, { getState, rejectWithValue }) => {
+>('tasks/toggleTaskCompletion', async (task, { getState, rejectWithValue }) => {
   const updatedTask = { ...task, completed: !task.completed };
+
   try {
     const currentTasks = getState().tasks.items;
-    const updatedTasks = currentTasks.map((t) =>
-      t.id === updatedTask.id ? updatedTask : t,
+    const updatedTasks = currentTasks.map((currentTask) =>
+      currentTask.id === updatedTask.id ? updatedTask : currentTask
     );
     await saveTasksToStorage(updatedTasks);
     return updatedTask;
@@ -117,22 +159,22 @@ export const deleteTask = createAsyncThunk<
   string,
   string,
   { rejectValue: string; state: { tasks: TasksState } }
->("tasks/deleteTask", async (id, { getState, rejectWithValue }) => {
+>('tasks/deleteTask', async (id, { getState, rejectWithValue }) => {
   try {
     const currentTasks = getState().tasks.items;
-    const filteredTasks = currentTasks.filter((t) => t.id !== id);
+    const filteredTasks = currentTasks.filter((task) => task.id !== id);
     await saveTasksToStorage(filteredTasks);
     return id;
-  } catch (err: any) {
-    return rejectWithValue("Failed to delete task locally.");
+  } catch (error: any) {
+    return rejectWithValue('Failed to delete task locally.');
   }
 });
 
 const tasksSlice = createSlice({
-  name: "tasks",
+  name: 'tasks',
   initialState,
   reducers: {
-    setFilter(state, action: PayloadAction<TasksState["filter"]>) {
+    setFilter(state, action: PayloadAction<TasksState['filter']>) {
       state.filter = action.payload;
     },
     clearError(state) {
@@ -142,16 +184,16 @@ const tasksSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchTasks.pending, (state) => {
-        state.status = "loading";
+        state.status = 'loading';
         state.error = null;
       })
       .addCase(fetchTasks.fulfilled, (state, action) => {
-        state.status = "succeeded";
+        state.status = 'succeeded';
         state.items = action.payload;
       })
       .addCase(fetchTasks.rejected, (state, action) => {
-        state.status = "failed";
-        state.error = action.payload ?? "Unknown error.";
+        state.status = 'failed';
+        state.error = action.payload ?? 'Unknown error.';
       })
       .addCase(addTask.pending, (state) => {
         state.saving = true;
@@ -163,7 +205,7 @@ const tasksSlice = createSlice({
       })
       .addCase(addTask.rejected, (state, action) => {
         state.saving = false;
-        state.error = action.payload ?? "Failed to add task.";
+        state.error = action.payload ?? 'Failed to add task.';
       })
       .addCase(updateTask.pending, (state) => {
         state.saving = true;
@@ -171,31 +213,35 @@ const tasksSlice = createSlice({
       })
       .addCase(updateTask.fulfilled, (state, action) => {
         state.saving = false;
-        const index = state.items.findIndex((t) => t.id === action.payload.id);
-        if (index !== -1) state.items[index] = action.payload;
+        const index = state.items.findIndex((task) => task.id === action.payload.id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
       })
       .addCase(updateTask.rejected, (state, action) => {
         state.saving = false;
-        state.error = action.payload ?? "Failed to update task.";
+        state.error = action.payload ?? 'Failed to update task.';
       })
       .addCase(toggleTaskCompletion.pending, (state, action) => {
-        const index = state.items.findIndex((t) => t.id === action.meta.arg.id);
+        const index = state.items.findIndex((task) => task.id === action.meta.arg.id);
         if (index !== -1) {
           state.items[index].completed = !state.items[index].completed;
         }
       })
       .addCase(toggleTaskCompletion.fulfilled, (state, action) => {
-        const index = state.items.findIndex((t) => t.id === action.payload.id);
-        if (index !== -1) state.items[index] = action.payload;
+        const index = state.items.findIndex((task) => task.id === action.payload.id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
       })
       .addCase(toggleTaskCompletion.rejected, (state, action) => {
         if (action.payload) {
-          const index = state.items.findIndex(
-            (t) => t.id === action.payload!.id,
-          );
-          if (index !== -1) state.items[index] = action.payload.originalTask;
+          const index = state.items.findIndex((task) => task.id === action.payload!.id);
+          if (index !== -1) {
+            state.items[index] = action.payload.originalTask;
+          }
         }
-        state.error = "Could not update task. Please check your storage.";
+        state.error = 'Could not update task. Please check your storage.';
       })
       .addCase(deleteTask.pending, (state, action) => {
         state.deleting = action.meta.arg;
@@ -203,13 +249,11 @@ const tasksSlice = createSlice({
       })
       .addCase(deleteTask.fulfilled, (state, action) => {
         state.deleting = null;
-        state.items = state.items.filter(
-          (t) => String(t.id) !== String(action.payload),
-        );
+        state.items = state.items.filter((task) => String(task.id) !== String(action.payload));
       })
       .addCase(deleteTask.rejected, (state, action) => {
         state.deleting = null;
-        state.error = action.payload ?? "Failed to delete task.";
+        state.error = action.payload ?? 'Failed to delete task.';
       });
   },
 });

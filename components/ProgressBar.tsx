@@ -1,12 +1,15 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
-import { Colors, Radii } from '../constants/theme';
+import { Animated, StyleSheet, View } from 'react-native';
+import { Radii, ThemeColors } from '../constants/theme';
+import { useAppTheme } from '../providers/theme-provider';
 
 interface ProgressBarProps {
-  progress: number; // 0 to 1
+  progress: number;
 }
 
 export default function ProgressBar({ progress }: ProgressBarProps) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const animatedWidth = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -15,7 +18,7 @@ export default function ProgressBar({ progress }: ProgressBarProps) {
       duration: 1000,
       useNativeDriver: false,
     }).start();
-  }, [progress]);
+  }, [animatedWidth, progress]);
 
   return (
     <View style={styles.container}>
@@ -34,17 +37,18 @@ export default function ProgressBar({ progress }: ProgressBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    height: 6,
-    backgroundColor: Colors.dark.surfaceContainerHighest,
-    borderRadius: Radii.pill,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    backgroundColor: Colors.dark.primary, // Could optionally use a gradient using expo-linear-gradient
-    borderTopRightRadius: Radii.pill,
-    borderBottomRightRadius: Radii.pill,
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      height: 10,
+      backgroundColor: colors.progressTrack,
+      borderRadius: Radii.pill,
+      overflow: 'hidden',
+    },
+    fill: {
+      height: '100%',
+      backgroundColor: colors.progressFill,
+      borderTopRightRadius: Radii.pill,
+      borderBottomRightRadius: Radii.pill,
+    },
+  });
