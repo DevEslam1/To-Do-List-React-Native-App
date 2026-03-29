@@ -30,6 +30,7 @@ import TaskModal from '../components/TaskModal';
 import { Radii, Spacing, ThemeColors, Typography } from '../constants/theme';
 import { useAppTheme } from '../providers/theme-provider';
 import { buildDefaultSchedule, getTodayDateKey } from '../utils/taskSchedule';
+import { scoreTaskSearchMatch } from '../utils/taskSearch';
 
 type HomeNavFilter = 'today' | 'inbox' | 'projects';
 
@@ -45,6 +46,8 @@ export default function HomeScreen() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [quickTaskTitle, setQuickTaskTitle] = useState('');
   const [focusTask, setFocusTask] = useState<Task | null>(null);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     dispatch(fetchTasks());
@@ -87,13 +90,37 @@ export default function HomeScreen() {
     });
   }, [filter, items, todayKey]);
 
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim();
+    if (!query) {
+      return filteredTasks;
+    }
+
+    return filteredTasks
+      .map((task) => ({
+        task,
+        score: scoreTaskSearchMatch(task, query),
+      }))
+      .filter((entry): entry is { task: Task; score: number } => entry.score !== null)
+      .sort((left, right) => {
+        if (right.score !== left.score) {
+          return right.score - left.score;
+        }
+
+        const leftKey = `${left.task.dueDate} ${left.task.startTime}`;
+        const rightKey = `${right.task.dueDate} ${right.task.startTime}`;
+        return leftKey.localeCompare(rightKey);
+      })
+      .map((entry) => entry.task);
+  }, [filteredTasks, searchQuery]);
+
   const completionCount = items.filter((task) => task.completed).length;
   const progressRatio = items.length > 0 ? completionCount / items.length : 0;
   const completionPercent = Math.round(progressRatio * 100);
   const summaryCount =
     filter === 'completed'
-      ? filteredTasks.length
-      : filteredTasks.filter((task) => !task.completed).length;
+      ? searchResults.length
+      : searchResults.filter((task) => !task.completed).length;
 
   const sectionTitle = (() => {
     switch (filter) {
@@ -111,9 +138,11 @@ export default function HomeScreen() {
   })();
 
   const remainingLabel =
-    filter === 'completed'
-      ? `${summaryCount} completed tasks archived`
-      : `${summaryCount} tasks remaining`;
+    searchQuery.trim()
+      ? `${summaryCount} search ${summaryCount === 1 ? 'result' : 'results'}`
+      : filter === 'completed'
+        ? `${summaryCount} completed tasks archived`
+        : `${summaryCount} tasks remaining`;
 
   const quickAddPlaceholder =
     filter === 'today'
@@ -202,10 +231,50 @@ export default function HomeScreen() {
 
           <Text style={styles.headerTitle}>Task Log</Text>
 
-          <Pressable style={styles.avatarButton} onPress={() => setSidebarOpen(true)}>
-            <MaterialIcons name="account-circle" size={28} color={colors.avatarIcon} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={styles.searchButton}
+              onPress={() => {
+                if (searchVisible && !searchQuery.trim()) {
+                  setSearchVisible(false);
+                  return;
+                }
+
+                if (searchVisible && searchQuery.trim()) {
+                  setSearchQuery('');
+                  return;
+                }
+
+                setSearchVisible(true);
+              }}
+            >
+              <MaterialIcons
+                name={searchVisible ? 'close' : 'search'}
+                size={20}
+                color={colors.onSurfaceVariant}
+              />
+            </Pressable>
+
+            <Pressable style={styles.avatarButton} onPress={() => setSidebarOpen(true)}>
+              <MaterialIcons name="account-circle" size={28} color={colors.avatarIcon} />
+            </Pressable>
+          </View>
         </View>
+
+        {searchVisible ? (
+          <View style={styles.searchBar}>
+            <MaterialIcons name="search" size={18} color={colors.onSurfaceVariant} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search tasks, tags, focus mode, or schedule"
+              placeholderTextColor={colors.onSurfaceVariant}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+              returnKeyType="search"
+            />
+          </View>
+        ) : null}
 
         {error ? (
           <View style={styles.errorBanner}>
@@ -251,19 +320,23 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.taskColumn}>
-              {filteredTasks.length === 0 ? (
+              {searchResults.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <Text style={styles.emptyTitle}>Nothing urgent here.</Text>
+                  <Text style={styles.emptyTitle}>
+                    {searchQuery.trim() ? 'No matching tasks found.' : 'Nothing urgent here.'}
+                  </Text>
                   <Text style={styles.emptyBody}>
-                    Add a quick one-liner below or open the center button for a full task.
+                    {searchQuery.trim()
+                      ? 'Try a task title, tag, priority, focus, date, or time keyword.'
+                      : 'Add a quick one-liner below or open the center button for a full task.'}
                   </Text>
                 </View>
               ) : (
-                filteredTasks.map((task, index) => (
+                searchResults.map((task, index) => (
                   <TaskItem
                     key={String(task.id)}
                     task={task}
-                    index={filteredTasks.length - index}
+                    index={searchResults.length - index}
                     onToggle={(item) => dispatch(toggleTaskCompletion(item))}
                     onPress={(item) => {
                       setEditingTask(item);
@@ -458,6 +531,42 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       fontSize: 20,
       color: colors.primary,
       letterSpacing: -0.4,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    searchButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceContainerHigh,
+      borderWidth: isDark ? 0 : 1,
+      borderColor: colors.outlineVariant,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginHorizontal: 28,
+      marginTop: 10,
+      marginBottom: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceContainerHigh,
+      borderWidth: isDark ? 0 : 1,
+      borderColor: colors.outlineVariant,
+    },
+    searchInput: {
+      flex: 1,
+      fontFamily: Typography.body,
+      fontSize: 15,
+      color: colors.onSurface,
+      paddingVertical: 0,
     },
     avatarButton: {
       width: 40,
