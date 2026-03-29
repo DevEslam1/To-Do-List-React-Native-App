@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Task } from '../store/tasksSlice';
-import { Colors, Typography, Spacing, Radii } from '../constants/Theme';
+import { Colors, Typography, Spacing, Radii } from '../constants/theme';
 
 interface TaskModalProps {
   visible: boolean;
@@ -61,7 +61,7 @@ export default function TaskModal({ visible, onClose, onSave, task }: TaskModalP
           <View style={styles.header}>
             <Text style={styles.modalTitle}>{task ? 'Edit Task' : 'New Task'}</Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
-              <MaterialIcons name="close" size={24} color={Colors.onSurfaceVariant} />
+              <MaterialIcons name="close" size={24} color={Colors.dark.onSurfaceVariant} />
             </Pressable>
           </View>
 
@@ -69,7 +69,7 @@ export default function TaskModal({ visible, onClose, onSave, task }: TaskModalP
             <TextInput
               style={styles.inputTitle}
               placeholder="Task title..."
-              placeholderTextColor={Colors.onSurfaceVariant}
+              placeholderTextColor={Colors.dark.onSurfaceVariant}
               value={title}
               onChangeText={setTitle}
               maxLength={60}
@@ -78,7 +78,7 @@ export default function TaskModal({ visible, onClose, onSave, task }: TaskModalP
             <TextInput
               style={styles.inputDesc}
               placeholder="Quick Note. Capture thoughts instantly."
-              placeholderTextColor={Colors.onSurfaceVariant}
+              placeholderTextColor={Colors.dark.onSurfaceVariant}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -116,7 +116,7 @@ export default function TaskModal({ visible, onClose, onSave, task }: TaskModalP
                   <Text style={[
                       styles.chipText, 
                       priority === p && styles.chipTextActive,
-                      p === 'high' && priority === p && { color: Colors.tertiary }
+                      p === 'high' && priority === p && { color: Colors.dark.tertiary }
                     ]}
                   >
                     {p.charAt(0).toUpperCase() + p.slice(1)}
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   surface: {
-    backgroundColor: Colors.surfaceContainer,
+    backgroundColor: Colors.dark.surfaceContainer,
     borderTopLeftRadius: Radii.xl,
     borderTopRightRadius: Radii.xl,
     maxHeight: '90%',
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.headline,
     fontSize: 24,
     fontWeight: '700',
-    color: Colors.onSurface,
+    color: Colors.dark.onSurface,
   },
   closeBtn: {
     padding: Spacing.xs,
@@ -178,23 +178,23 @@ const styles = StyleSheet.create({
   inputTitle: {
     fontFamily: Typography.headline,
     fontSize: 24,
-    color: Colors.onSurface,
+    color: Colors.dark.onSurface,
     borderBottomWidth: 2,
-    borderBottomColor: Colors.surfaceContainerHighest,
+    borderBottomColor: Colors.dark.surfaceContainerHighest,
     paddingVertical: Spacing.sm,
     marginBottom: Spacing.lg,
   },
   inputDesc: {
     fontFamily: Typography.body,
     fontSize: 16,
-    color: Colors.onSurfaceVariant,
+    color: Colors.dark.onSurfaceVariant,
     minHeight: 80,
     marginBottom: Spacing.xl,
   },
   label: {
     fontFamily: Typography.body,
     fontSize: 14,
-    color: Colors.onSurfaceVariant,
+    color: Colors.dark.onSurfaceVariant,
     marginBottom: Spacing.sm,
     fontWeight: '500',
   },
@@ -205,22 +205,22 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   chip: {
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: Colors.dark.surfaceContainerHigh,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     borderRadius: Radii.pill,
   },
   chipActive: {
-    backgroundColor: Colors.primaryDim,
+    backgroundColor: Colors.dark.primaryDim,
   },
   chipText: {
     fontFamily: Typography.body,
     fontSize: 14,
-    color: Colors.onSurfaceVariant,
+    color: Colors.dark.onSurfaceVariant,
     fontWeight: '500',
   },
   chipTextActive: {
-    color: Colors.onSurface,
+    color: Colors.dark.onSurface,
   },
   footer: {
     flexDirection: 'row',
@@ -236,12 +236,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnPrimary: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.dark.primary,
   },
   btnPrimaryText: {
     fontFamily: Typography.body,
     fontWeight: '600',
-    color: Colors.onPrimary,
+    color: Colors.dark.onPrimary,
     fontSize: 14,
   },
   btnSecondary: {
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   btnSecondaryText: {
     fontFamily: Typography.body,
     fontWeight: '600',
-    color: Colors.onSurface,
+    color: Colors.dark.onSurface,
     fontSize: 14,
   },
 });

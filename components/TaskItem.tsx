@@ -1,16 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Task } from '../store/tasksSlice';
-import { Colors, Typography, Spacing, Radii } from '../constants/Theme';
+import { Colors, Typography, Spacing, Radii, Fonts } from '../constants/theme';
 
 interface TaskItemProps {
   task: Task;
   onToggle: (task: Task) => void;
   onPress: (task: Task) => void;
+  onDelete: (task: Task) => void;
 }
 
-export default function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
+export default function TaskItem({ task, onToggle, onPress, onDelete }: TaskItemProps) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -26,7 +28,7 @@ export default function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
         hitSlop={10}
       >
         {task.completed && (
-          <MaterialIcons name="check" size={16} color={Colors.onPrimary} />
+          <MaterialIcons name="check" size={16} color={Colors.dark.onPrimary} />
         )}
       </Pressable>
 
@@ -41,16 +43,30 @@ export default function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
         ) : null}
         
         <View style={styles.metaContainer}>
-          <View style={[styles.badge, { backgroundColor: Colors.surfaceContainerHigh }]}>
-            <Text style={[styles.badgeText, { color: Colors.primary }]}>{task.tag}</Text>
+          <View style={[styles.badge, { backgroundColor: Colors.dark.surfaceContainerHigh }]}>
+            <Text style={[styles.badgeText, { color: Colors.dark.primary }]}>{task.tag}</Text>
           </View>
           {task.priority === 'high' && (
-            <View style={[styles.badge, styles.badgeHigh]}>
-              <Text style={[styles.badgeText, { color: Colors.tertiary }]}>High Priority</Text>
-            </View>
+            <LinearGradient
+              colors={[Colors.dark.tertiary + '30', Colors.dark.tertiary + '10']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.badge}
+            >
+              <Text style={[styles.badgeText, { color: Colors.dark.tertiary }]}>High Priority</Text>
+            </LinearGradient>
           )}
         </View>
       </View>
+
+      {/* Delete button */}
+      <Pressable
+        onPress={() => onDelete(task)}
+        hitSlop={8}
+        style={styles.deleteBtn}
+      >
+        <MaterialIcons name="delete-outline" size={20} color={Colors.dark.onSurfaceVariant} />
+      </Pressable>
     </Pressable>
   );
 }
@@ -59,31 +75,34 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     padding: Spacing.lg,
-    backgroundColor: Colors.surfaceContainer,
+    backgroundColor: Colors.dark.surfaceContainer,
     borderRadius: Radii.xl,
     marginBottom: Spacing.sm,
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.dark.outlineVariant + '20',
   },
   containerPressed: {
-    backgroundColor: Colors.surfaceContainerHighest,
+    backgroundColor: Colors.dark.surfaceContainerHighest,
+    transform: [{ scale: 0.98 }],
   },
   containerCompleted: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: Radii.pill,
     borderWidth: 2,
-    borderColor: Colors.outlineVariant,
+    borderColor: Colors.dark.outlineVariant,
     marginRight: Spacing.md,
     marginTop: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxCompleted: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.dark.primary,
+    borderColor: Colors.dark.primary,
   },
   content: {
     flex: 1,
@@ -91,18 +110,19 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: Typography.body,
     fontSize: 16,
-    fontWeight: '500',
-    color: Colors.onSurface,
-    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    color: Colors.dark.onSurface,
+    marginBottom: 4,
   },
   titleCompleted: {
-    color: Colors.onSurfaceVariant,
+    color: Colors.dark.onSurfaceVariant,
     textDecorationLine: 'line-through',
   },
   description: {
-    fontFamily: Typography.body,
-    fontSize: 14,
-    color: Colors.onSurfaceVariant,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    color: Colors.dark.onSurfaceVariant,
+    lineHeight: 18,
     marginBottom: Spacing.md,
   },
   metaContainer: {
@@ -110,16 +130,19 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   badge: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: Radii.pill,
   },
-  badgeHigh: {
-    backgroundColor: 'rgba(255, 150, 187, 0.1)', // Tertiary 10%
+  deleteBtn: {
+    padding: 6,
+    marginLeft: Spacing.sm,
+    opacity: 0.5,
   },
   badgeText: {
-    fontFamily: Typography.body,
-    fontSize: 12,
+    fontFamily: Fonts.label,
+    fontSize: 11,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });

@@ -4,7 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setFilter, TasksState } from '../store/tasksSlice';
 import ProgressBar from './ProgressBar';
-import { Colors, Typography, Spacing, Radii } from '../constants/Theme';
+import { Colors, Typography, Spacing, Radii } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = Math.min(width * 0.8, 320);
@@ -21,9 +21,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const translateX = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
+  const [isAnimating, setIsAnimating] = React.useState(false);
 
   useEffect(() => {
     if (isOpen) {
+      setIsAnimating(true);
       Animated.parallel([
         Animated.timing(translateX, {
           toValue: 0,
@@ -48,7 +50,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           duration: 250,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        setIsAnimating(false);
+      });
     }
   }, [isOpen]);
 
@@ -67,18 +71,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const completeCount = tasks.filter(t => t.completed).length;
   const progressRatio = tasks.length > 0 ? completeCount / tasks.length : 0;
   
-  if (!isOpen && translateX._value === -SIDEBAR_WIDTH) {
+  if (!isOpen && !isAnimating) {
     return null; 
   }
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <View style={StyleSheet.absoluteFill} pointerEvents={isOpen ? 'auto' : 'none'}>
       {/* Background Overlay */}
-      {isOpen && (
-        <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        </Animated.View>
-      )}
+      <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
 
       {/* Sidebar Panel */}
       <Animated.View style={[styles.panel, { transform: [{ translateX }] }]}>
@@ -99,7 +101,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <MaterialIcons
                   name={item.icon}
                   size={24}
-                  color={isActive ? Colors.onSecondaryContainer : Colors.onSurfaceVariant}
+                  color={isActive ? Colors.dark.onSecondaryContainer : Colors.dark.onSurfaceVariant}
                 />
                 <Text style={[styles.navItemText, isActive && styles.navItemTextActive]}>
                   {item.label}
@@ -121,7 +123,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <View style={styles.spacer} />
 
         <Pressable style={styles.navItem} onPress={() => {}}>
-          <MaterialIcons name="settings" size={24} color={Colors.onSurfaceVariant} />
+          <MaterialIcons name="settings" size={24} color={Colors.dark.onSurfaceVariant} />
           <Text style={styles.navItemText}>Settings</Text>
         </Pressable>
       </Animated.View>
@@ -141,9 +143,9 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: SIDEBAR_WIDTH,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: Colors.dark.surfaceContainerLow,
     borderRightWidth: 1,
-    borderRightColor: Colors.outlineVariant + '40', // 25% opacity
+    borderRightColor: Colors.dark.outlineVariant + '40', // 25% opacity
     padding: Spacing.xl,
     paddingTop: 60, // accommodate safe area
     zIndex: 20,
@@ -156,7 +158,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.headline,
     fontWeight: '700',
     fontSize: 20,
-    color: Colors.onSurface,
+    color: Colors.dark.onSurface,
     marginBottom: 4,
   },
   subtitle: {
@@ -164,7 +166,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 1,
-    color: Colors.onSurfaceVariant,
+    color: Colors.dark.onSurfaceVariant,
   },
   nav: {
     gap: Spacing.sm,
@@ -178,41 +180,41 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   navItemActive: {
-    backgroundColor: Colors.secondaryContainer,
+    backgroundColor: Colors.dark.secondaryContainer,
   },
   navItemText: {
     fontFamily: Typography.body,
     fontSize: 16,
     fontWeight: '500',
-    color: Colors.onSurfaceVariant,
+    color: Colors.dark.onSurfaceVariant,
   },
   navItemTextActive: {
-    color: Colors.onSecondaryContainer,
+    color: Colors.dark.onSecondaryContainer,
   },
   momentumCard: {
     marginTop: 'auto',
     marginBottom: Spacing.xl,
     padding: Spacing.lg,
-    backgroundColor: Colors.surfaceContainer,
+    backgroundColor: Colors.dark.surfaceContainer,
     borderRadius: Radii.xl,
   },
   momentumTitle: {
     fontFamily: Typography.body,
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.onSurface,
+    color: Colors.dark.onSurface,
     marginBottom: Spacing.sm,
   },
   momentumDesc: {
     fontFamily: Typography.body,
     fontSize: 12,
-    color: Colors.onSurfaceVariant,
+    color: Colors.dark.onSurfaceVariant,
     lineHeight: 18,
     marginBottom: Spacing.lg,
   },
   spacer: {
     height: 1,
-    backgroundColor: Colors.outlineVariant + '40',
+    backgroundColor: Colors.dark.outlineVariant + '40',
     marginVertical: Spacing.md,
   },
 });
