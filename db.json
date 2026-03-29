@@ -1,0 +1,37 @@
+{
+  "tasks": [
+    {
+      "id": "1",
+      "title": "Review quarterly editorial strategy",
+      "description": "Go through the Q3 document and leave comments.",
+      "completed": false,
+      "tag": "Work",
+      "priority": "normal",
+      "dueDate": "2026-03-29"
+    },
+    {
+      "id": "2",
+      "title": "Finalize typography system for 'The Silent Architect'",
+      "description": "Choose between Manrope and Inter for body text.",
+      "completed": false,
+      "tag": "Design",
+      "priority": "high",
+      "dueDate": "2026-03-29"
+    },
+    {
+      "id": "3",
+      "title": "Systematic backup of active project files",
+      "description": "Upload folder to Google Drive.",
+      "completed": true,
+      "tag": "Admin",
+      "priority": "normal",
+      "dueDate": "2026-03-28"
+    }
+  ],
+  "categories": [
+    { "id": "Work", "name": "Work" },
+    { "id": "Personal", "name": "Personal" },
+    { "id": "Design", "name": "Design" },
+    { "id": "Admin", "name": "Admin" }
+  ]
+}
