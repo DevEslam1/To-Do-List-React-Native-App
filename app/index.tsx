@@ -28,6 +28,7 @@ import Sidebar from '../components/Sidebar';
 import TaskItem from '../components/TaskItem';
 import TaskModal from '../components/TaskModal';
 import { Radii, Spacing, ThemeColors, Typography } from '../constants/theme';
+import { ResponsiveLayout, useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { useAppTheme } from '../providers/theme-provider';
 import { buildDefaultSchedule, getTodayDateKey } from '../utils/taskSchedule';
 import { scoreTaskSearchMatch } from '../utils/taskSearch';
@@ -37,8 +38,9 @@ type HomeNavFilter = 'today' | 'inbox' | 'projects';
 export default function HomeScreen() {
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
+  const layout = useResponsiveLayout();
   const { colors, isDark } = useAppTheme();
-  const styles = createStyles(colors, isDark);
+  const styles = createStyles(colors, isDark, layout);
   const { items, status, filter, error, saving } = useAppSelector((state) => state.tasks);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -221,270 +223,342 @@ export default function HomeScreen() {
     setQuickTaskTitle('');
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.screen}>
-        <View style={styles.header}>
-          <Pressable style={styles.headerButton} onPress={() => setSidebarOpen(true)}>
-            <MaterialIcons name="menu" size={25} color={colors.primary} />
-          </Pressable>
-
-          <Text style={styles.headerTitle}>Task Log</Text>
-
-          <View style={styles.headerActions}>
-            <Pressable
-              style={styles.searchButton}
-              onPress={() => {
-                if (searchVisible && !searchQuery.trim()) {
-                  setSearchVisible(false);
-                  return;
-                }
-
-                if (searchVisible && searchQuery.trim()) {
-                  setSearchQuery('');
-                  return;
-                }
-
-                setSearchVisible(true);
-              }}
-            >
-              <MaterialIcons
-                name={searchVisible ? 'close' : 'search'}
-                size={20}
-                color={colors.onSurfaceVariant}
-              />
-            </Pressable>
-
-            <Pressable style={styles.avatarButton} onPress={() => setSidebarOpen(true)}>
-              <MaterialIcons name="account-circle" size={28} color={colors.avatarIcon} />
-            </Pressable>
-          </View>
+  const taskList = (
+    <View style={styles.taskColumn}>
+      {searchResults.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>
+            {searchQuery.trim() ? 'No matching tasks found.' : 'Nothing urgent here.'}
+          </Text>
+          <Text style={styles.emptyBody}>
+            {searchQuery.trim()
+              ? 'Try a task title, tag, priority, focus, date, or time keyword.'
+              : 'Add a quick one-liner below or open the center button for a full task.'}
+          </Text>
         </View>
+      ) : (
+        searchResults.map((task, index) => (
+          <TaskItem
+            key={String(task.id)}
+            task={task}
+            index={searchResults.length - index}
+            onToggle={(item) => dispatch(toggleTaskCompletion(item))}
+            onPress={(item) => {
+              setEditingTask(item);
+              setModalVisible(true);
+            }}
+            onDelete={(item) => dispatch(deleteTask(item.id))}
+            onStartFocus={(item) => setFocusTask(item)}
+          />
+        ))
+      )}
+    </View>
+  );
 
-        {searchVisible ? (
-          <View style={styles.searchBar}>
-            <MaterialIcons name="search" size={18} color={colors.onSurfaceVariant} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search tasks, tags, focus mode, or schedule"
-              placeholderTextColor={colors.onSurfaceVariant}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoFocus
-              returnKeyType="search"
-            />
-          </View>
-        ) : null}
+  const progressCard = (
+    <View style={styles.focusCard}>
+      <MaterialIcons
+        name="trending-up"
+        size={layout.isWideTablet ? 126 : 116}
+        color={colors.onSurface}
+        style={styles.focusGraphic}
+      />
+      <Text style={styles.focusTitle}>Weekly Focus</Text>
+      <Text style={styles.focusBody}>
+        You&apos;ve completed {completionPercent}% of your task goals this week. Keep the
+        momentum.
+      </Text>
+      <ProgressBar progress={progressRatio} />
+    </View>
+  );
 
-        {error ? (
-          <View style={styles.errorBanner}>
-            <MaterialIcons name="error-outline" size={16} color={colors.tertiary} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
+  const quickNoteCard = (
+    <Pressable onPress={openCreateModal}>
+      <LinearGradient
+        colors={[colors.quickNoteGradientStart, colors.quickNoteGradientEnd]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.quickNoteCard}
+      >
+        <View style={styles.quickNoteIcon}>
+          <MaterialIcons name="auto-awesome" size={20} color={colors.onPrimary} />
+        </View>
+        <Text style={styles.quickNoteLabel}>Quick Note</Text>
+        <Text style={styles.quickNoteTitle}>
+          Capture thoughts instantly, then schedule the start time and duration.
+        </Text>
+      </LinearGradient>
+    </Pressable>
+  );
 
-        {status === 'loading' && items.length === 0 ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.stateText}>Loading tasks...</Text>
-          </View>
-        ) : status === 'failed' && items.length === 0 ? (
-          <View style={styles.centerState}>
-            <MaterialIcons
-              name="cloud-off"
-              size={56}
-              color={colors.onSurfaceVariant}
-              style={styles.stateIcon}
-            />
-            <Text style={styles.stateText}>Could not read your local task storage.</Text>
-            <Pressable style={styles.retryButton} onPress={() => dispatch(fetchTasks())}>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </Pressable>
-          </View>
+  const quickAddComposer = (
+    <LinearGradient
+      colors={[colors.quickAddGradientStart, colors.quickAddGradientEnd]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.quickAddBar}
+    >
+      <Text style={styles.quickAddPrefix}>+</Text>
+      <TextInput
+        style={styles.quickAddInput}
+        placeholder={quickAddPlaceholder}
+        placeholderTextColor={colors.onSurfaceVariant}
+        value={quickTaskTitle}
+        onChangeText={setQuickTaskTitle}
+        returnKeyType="done"
+        onSubmitEditing={() => handleQuickAdd()}
+      />
+      <Pressable style={styles.quickAddCalendar} onPress={openCreateModal}>
+        <MaterialIcons name="calendar-today" size={21} color={colors.onSurfaceVariant} />
+      </Pressable>
+      <Pressable
+        style={[
+          styles.quickAddSave,
+          (!quickTaskTitle.trim() || saving) && styles.quickAddSaveDisabled,
+        ]}
+        disabled={!quickTaskTitle.trim() || saving}
+        onPress={handleQuickAdd}
+      >
+        {saving ? (
+          <ActivityIndicator size="small" color={colors.onPrimary} />
         ) : (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[
-              styles.scrollContent,
-              { paddingBottom: 178 + Math.max(insets.bottom, Spacing.md) },
-            ]}
-          >
-            <View style={styles.banner}>
-              <Text style={styles.bannerTitle}>{sectionTitle}</Text>
-              <View style={styles.bannerMetaRow}>
-                <Text style={styles.bannerSubtitleAccent}>{formattedDate}</Text>
-                <View style={styles.bannerMetaDot} />
-                <Text style={styles.bannerSubtitle}>{remainingLabel}</Text>
+          <Text style={styles.quickAddSaveText}>Save</Text>
+        )}
+      </Pressable>
+    </LinearGradient>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <View style={styles.screen}>
+        {layout.isWideTablet ? (
+          <Sidebar isOpen onClose={() => undefined} variant="docked" />
+        ) : null}
+
+        <View style={styles.mainPane}>
+          <View style={styles.topShell}>
+            <View style={styles.header}>
+              <View style={styles.headerBrand}>
+                {!layout.isWideTablet ? (
+                  <Pressable style={styles.headerButton} onPress={() => setSidebarOpen(true)}>
+                    <MaterialIcons name="menu" size={25} color={colors.primary} />
+                  </Pressable>
+                ) : null}
+
+                <Text style={styles.headerTitle}>Task Log</Text>
+              </View>
+
+              <View style={styles.headerActions}>
+                <Pressable
+                  style={styles.searchButton}
+                  onPress={() => {
+                    if (searchVisible && !searchQuery.trim()) {
+                      setSearchVisible(false);
+                      return;
+                    }
+
+                    if (searchVisible && searchQuery.trim()) {
+                      setSearchQuery('');
+                      return;
+                    }
+
+                    setSearchVisible(true);
+                  }}
+                >
+                  <MaterialIcons
+                    name={searchVisible ? 'close' : 'search'}
+                    size={20}
+                    color={colors.onSurfaceVariant}
+                  />
+                </Pressable>
+
+                {layout.isWideTablet ? (
+                  <Pressable style={styles.headerCreateButton} onPress={openCreateModal}>
+                    <MaterialIcons name="add" size={18} color={colors.onPrimary} />
+                    <Text style={styles.headerCreateButtonText}>New Task</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable style={styles.avatarButton} onPress={() => setSidebarOpen(true)}>
+                    <MaterialIcons name="account-circle" size={28} color={colors.avatarIcon} />
+                  </Pressable>
+                )}
               </View>
             </View>
 
-            <View style={styles.taskColumn}>
-              {searchResults.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyTitle}>
-                    {searchQuery.trim() ? 'No matching tasks found.' : 'Nothing urgent here.'}
-                  </Text>
-                  <Text style={styles.emptyBody}>
-                    {searchQuery.trim()
-                      ? 'Try a task title, tag, priority, focus, date, or time keyword.'
-                      : 'Add a quick one-liner below or open the center button for a full task.'}
-                  </Text>
-                </View>
-              ) : (
-                searchResults.map((task, index) => (
-                  <TaskItem
-                    key={String(task.id)}
-                    task={task}
-                    index={searchResults.length - index}
-                    onToggle={(item) => dispatch(toggleTaskCompletion(item))}
-                    onPress={(item) => {
-                      setEditingTask(item);
-                      setModalVisible(true);
-                    }}
-                    onDelete={(item) => dispatch(deleteTask(item.id))}
-                    onStartFocus={(item) => setFocusTask(item)}
-                  />
-                ))
-              )}
-            </View>
+            {searchVisible ? (
+              <View style={styles.searchBar}>
+                <MaterialIcons name="search" size={18} color={colors.onSurfaceVariant} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search tasks, tags, focus mode, or schedule"
+                  placeholderTextColor={colors.onSurfaceVariant}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  autoFocus
+                  returnKeyType="search"
+                />
+              </View>
+            ) : null}
 
-            <View style={styles.focusCard}>
+            {error ? (
+              <View style={styles.errorBanner}>
+                <MaterialIcons name="error-outline" size={16} color={colors.tertiary} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {status === 'loading' && items.length === 0 ? (
+            <View style={styles.centerState}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.stateText}>Loading tasks...</Text>
+            </View>
+          ) : status === 'failed' && items.length === 0 ? (
+            <View style={styles.centerState}>
               <MaterialIcons
-                name="trending-up"
-                size={116}
-                color={colors.onSurface}
-                style={styles.focusGraphic}
+                name="cloud-off"
+                size={56}
+                color={colors.onSurfaceVariant}
+                style={styles.stateIcon}
               />
-              <Text style={styles.focusTitle}>Weekly Focus</Text>
-              <Text style={styles.focusBody}>
-                You&apos;ve completed {completionPercent}% of your task goals this week. Keep the
-                momentum.
-              </Text>
-              <ProgressBar progress={progressRatio} />
+              <Text style={styles.stateText}>Could not read your local task storage.</Text>
+              <Pressable style={styles.retryButton} onPress={() => dispatch(fetchTasks())}>
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </Pressable>
             </View>
-
-            <Pressable onPress={openCreateModal}>
-              <LinearGradient
-                colors={[colors.quickNoteGradientStart, colors.quickNoteGradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.quickNoteCard}
-              >
-                <View style={styles.quickNoteIcon}>
-                  <MaterialIcons name="auto-awesome" size={20} color={colors.onPrimary} />
+          ) : (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={[
+                styles.scrollContent,
+                {
+                  paddingBottom: layout.isWideTablet
+                    ? Spacing.xxxl + Math.max(insets.bottom, Spacing.lg)
+                    : 178 + Math.max(insets.bottom, Spacing.md),
+                },
+              ]}
+            >
+              <View style={styles.contentShell}>
+                <View style={styles.banner}>
+                  <Text style={styles.bannerTitle}>{sectionTitle}</Text>
+                  <View style={styles.bannerMetaRow}>
+                    <Text style={styles.bannerSubtitleAccent}>{formattedDate}</Text>
+                    <View style={styles.bannerMetaDot} />
+                    <Text style={styles.bannerSubtitle}>{remainingLabel}</Text>
+                  </View>
                 </View>
-                <Text style={styles.quickNoteLabel}>Quick Note</Text>
-                <Text style={styles.quickNoteTitle}>
-                  Capture thoughts instantly, then schedule the start time and duration.
-                </Text>
-              </LinearGradient>
-            </Pressable>
 
-            <LinearGradient
-              colors={[colors.quickAddGradientStart, colors.quickAddGradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={styles.quickAddBar}
-            >
-              <Text style={styles.quickAddPrefix}>+</Text>
-              <TextInput
-                style={styles.quickAddInput}
-                placeholder={quickAddPlaceholder}
-                placeholderTextColor={colors.onSurfaceVariant}
-                value={quickTaskTitle}
-                onChangeText={setQuickTaskTitle}
-                returnKeyType="done"
-                onSubmitEditing={() => handleQuickAdd()}
-              />
-              <Pressable style={styles.quickAddCalendar} onPress={openCreateModal}>
-                <MaterialIcons name="calendar-today" size={21} color={colors.onSurfaceVariant} />
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.quickAddSave,
-                  (!quickTaskTitle.trim() || saving) && styles.quickAddSaveDisabled,
-                ]}
-                disabled={!quickTaskTitle.trim() || saving}
-                onPress={handleQuickAdd}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                {layout.isWideTablet ? (
+                  <View style={styles.workspaceGrid}>
+                    <View style={styles.primaryColumn}>{taskList}</View>
+                    <View style={styles.secondaryColumn}>
+                      {progressCard}
+                      {quickNoteCard}
+                      {quickAddComposer}
+                    </View>
+                  </View>
                 ) : (
-                  <Text style={styles.quickAddSaveText}>Save</Text>
+                  <>
+                    {taskList}
+                    {progressCard}
+                    {quickNoteCard}
+                    {quickAddComposer}
+                  </>
                 )}
-              </Pressable>
-            </LinearGradient>
-          </ScrollView>
-        )}
+              </View>
+            </ScrollView>
+          )}
 
-        <View style={[styles.bottomBar, { bottom: Math.max(insets.bottom, 14) }]}>
-          {navItems.slice(0, 2).map((item) => {
-            const active = filter === item.filterValue;
-            return (
-              <Pressable
-                key={item.key}
-                style={styles.navItem}
-                onPress={() => dispatch(setFilter(item.filterValue))}
-              >
-                <MaterialIcons
-                  name={item.icon}
-                  size={23}
-                  color={active ? colors.primary : colors.onSurfaceVariant}
-                />
-                <Text style={[styles.navLabel, active && styles.navLabelActive]}>{item.label}</Text>
-              </Pressable>
-            );
-          })}
-
-          <Pressable
-            style={[styles.centerAction, saving && styles.centerActionDisabled]}
-            onPress={openCreateModal}
-            disabled={saving}
-          >
-            <LinearGradient
-              colors={[colors.primary, colors.quickNoteGradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.centerActionGradient}
+          {!layout.isWideTablet ? (
+            <View
+              pointerEvents="box-none"
+              style={[
+                styles.bottomBarContainer,
+                {
+                  bottom: Math.max(insets.bottom, 14),
+                  paddingHorizontal: layout.isTablet ? layout.screenPadding : 14,
+                },
+              ]}
             >
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.onPrimary} />
-              ) : (
-                <MaterialIcons name="add" size={30} color={colors.onPrimary} />
-              )}
-            </LinearGradient>
-          </Pressable>
+              <View style={styles.bottomBar}>
+                {navItems.slice(0, 2).map((item) => {
+                  const active = filter === item.filterValue;
+                  return (
+                    <Pressable
+                      key={item.key}
+                      style={styles.navItem}
+                      onPress={() => dispatch(setFilter(item.filterValue))}
+                    >
+                      <MaterialIcons
+                        name={item.icon}
+                        size={23}
+                        color={active ? colors.primary : colors.onSurfaceVariant}
+                      />
+                      <Text style={[styles.navLabel, active && styles.navLabelActive]}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
 
-          {navItems.slice(2).map((item) => {
-            const active = filter === item.filterValue;
-            return (
-              <Pressable
-                key={item.key}
-                style={styles.navItem}
-                onPress={() => dispatch(setFilter(item.filterValue))}
-              >
-                <MaterialIcons
-                  name={item.icon}
-                  size={23}
-                  color={active ? colors.primary : colors.onSurfaceVariant}
-                />
-                <Text style={[styles.navLabel, active && styles.navLabelActive]}>{item.label}</Text>
-              </Pressable>
-            );
-          })}
+                <Pressable
+                  style={[styles.centerAction, saving && styles.centerActionDisabled]}
+                  onPress={openCreateModal}
+                  disabled={saving}
+                >
+                  <LinearGradient
+                    colors={[colors.primary, colors.quickNoteGradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.centerActionGradient}
+                  >
+                    {saving ? (
+                      <ActivityIndicator size="small" color={colors.onPrimary} />
+                    ) : (
+                      <MaterialIcons name="add" size={30} color={colors.onPrimary} />
+                    )}
+                  </LinearGradient>
+                </Pressable>
 
-          <Pressable style={styles.navItem} onPress={() => setSidebarOpen(true)}>
-            <MaterialIcons
-              name="more-horiz"
-              size={23}
-              color={sidebarOpen ? colors.primary : colors.onSurfaceVariant}
-            />
-            <Text style={[styles.navLabel, sidebarOpen && styles.navLabelActive]}>MORE</Text>
-          </Pressable>
+                {navItems.slice(2).map((item) => {
+                  const active = filter === item.filterValue;
+                  return (
+                    <Pressable
+                      key={item.key}
+                      style={styles.navItem}
+                      onPress={() => dispatch(setFilter(item.filterValue))}
+                    >
+                      <MaterialIcons
+                        name={item.icon}
+                        size={23}
+                        color={active ? colors.primary : colors.onSurfaceVariant}
+                      />
+                      <Text style={[styles.navLabel, active && styles.navLabelActive]}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+
+                <Pressable style={styles.navItem} onPress={() => setSidebarOpen(true)}>
+                  <MaterialIcons
+                    name="more-horiz"
+                    size={23}
+                    color={sidebarOpen ? colors.primary : colors.onSurfaceVariant}
+                  />
+                  <Text style={[styles.navLabel, sidebarOpen && styles.navLabelActive]}>
+                    MORE
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
+          {!layout.isWideTablet ? (
+            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+          ) : null}
         </View>
-
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <TaskModal
           visible={modalVisible}
@@ -499,7 +573,7 @@ export default function HomeScreen() {
   );
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) =>
+const createStyles = (colors: ThemeColors, isDark: boolean, layout: ResponsiveLayout) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -508,14 +582,31 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     screen: {
       flex: 1,
       backgroundColor: colors.background,
+      flexDirection: layout.isWideTablet ? 'row' : 'column',
+    },
+    mainPane: {
+      flex: 1,
+      minWidth: 0,
+    },
+    topShell: {
+      width: '100%',
+      maxWidth: layout.contentMaxWidth,
+      alignSelf: 'center',
     },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 28,
-      paddingTop: 12,
+      gap: Spacing.md,
+      paddingHorizontal: layout.screenPadding,
+      paddingTop: layout.isTablet ? 16 : 12,
       paddingBottom: 4,
+    },
+    headerBrand: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
     },
     headerButton: {
       width: 36,
@@ -525,12 +616,11 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       justifyContent: 'center',
     },
     headerTitle: {
-      flex: 1,
-      marginLeft: 10,
       fontFamily: Typography.headline,
-      fontSize: 20,
+      fontSize: layout.isWideTablet ? 24 : 20,
       color: colors.primary,
-      letterSpacing: -0.4,
+      letterSpacing: layout.isWideTablet ? -0.8 : -0.4,
+      flexShrink: 1,
     },
     headerActions: {
       flexDirection: 'row',
@@ -547,11 +637,26 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       borderWidth: isDark ? 0 : 1,
       borderColor: colors.outlineVariant,
     },
+    headerCreateButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: 12,
+      borderRadius: Radii.pill,
+      backgroundColor: colors.primary,
+    },
+    headerCreateButtonText: {
+      fontFamily: Typography.body,
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.onPrimary,
+    },
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      marginHorizontal: 28,
+      marginHorizontal: layout.screenPadding,
       marginTop: 10,
       marginBottom: 6,
       paddingHorizontal: 14,
@@ -582,7 +687,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: Spacing.sm,
-      marginHorizontal: 28,
+      marginHorizontal: layout.screenPadding,
       marginBottom: Spacing.md,
       paddingHorizontal: Spacing.lg,
       paddingVertical: Spacing.sm,
@@ -598,19 +703,25 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       color: colors.tertiary,
     },
     scrollContent: {
-      paddingHorizontal: 30,
+      alignItems: 'center',
+      paddingHorizontal: layout.screenPadding,
+      gap: 24,
+    },
+    contentShell: {
+      width: '100%',
+      maxWidth: layout.contentMaxWidth,
       gap: 24,
     },
     banner: {
-      paddingTop: 26,
+      paddingTop: layout.isWideTablet ? 32 : 26,
       paddingBottom: 4,
     },
     bannerTitle: {
       fontFamily: Typography.headline,
-      fontSize: 62,
-      lineHeight: 66,
+      fontSize: layout.isWideTablet ? 78 : layout.isTablet ? 70 : 62,
+      lineHeight: layout.isWideTablet ? 82 : layout.isTablet ? 74 : 66,
       color: colors.onSurface,
-      letterSpacing: -3.2,
+      letterSpacing: layout.isWideTablet ? -4.1 : layout.isTablet ? -3.4 : -3.2,
     },
     bannerMetaRow: {
       flexDirection: 'row',
@@ -639,6 +750,20 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     taskColumn: {
       marginTop: 8,
     },
+    workspaceGrid: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 24,
+    },
+    primaryColumn: {
+      flex: 1.35,
+      minWidth: 0,
+    },
+    secondaryColumn: {
+      flex: 0.95,
+      minWidth: 320,
+      gap: 24,
+    },
     emptyCard: {
       paddingHorizontal: 10,
       paddingVertical: 22,
@@ -659,8 +784,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     focusCard: {
       overflow: 'hidden',
-      paddingHorizontal: 24,
-      paddingVertical: 28,
+      paddingHorizontal: layout.isWideTablet ? 28 : 24,
+      paddingVertical: layout.isWideTablet ? 32 : 28,
       borderRadius: 30,
       backgroundColor: colors.card,
       borderWidth: 1,
@@ -668,28 +793,28 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     focusGraphic: {
       position: 'absolute',
-      right: -10,
+      right: layout.isWideTablet ? -4 : -10,
       bottom: -8,
       opacity: isDark ? 0.12 : 0.08,
       transform: [{ rotate: '-6deg' }],
     },
     focusTitle: {
       fontFamily: Typography.headline,
-      fontSize: 30,
-      lineHeight: 34,
+      fontSize: layout.isWideTablet ? 34 : 30,
+      lineHeight: layout.isWideTablet ? 38 : 34,
       color: colors.onSurface,
     },
     focusBody: {
       marginTop: 14,
       marginBottom: 22,
-      maxWidth: '72%',
+      maxWidth: layout.isWideTablet ? 280 : layout.isTablet ? 360 : '72%',
       fontFamily: Typography.body,
       fontSize: 15,
       lineHeight: 24,
       color: colors.onSurfaceVariant,
     },
     quickNoteCard: {
-      minHeight: 188,
+      minHeight: layout.isWideTablet ? 210 : 188,
       paddingHorizontal: 24,
       paddingVertical: 28,
       borderRadius: 32,
@@ -720,7 +845,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     quickAddBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 18,
+      paddingHorizontal: layout.isTablet ? 20 : 18,
       paddingVertical: 14,
       borderRadius: 24,
       borderWidth: 1,
@@ -735,6 +860,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     quickAddInput: {
       flex: 1,
+      minWidth: 0,
       fontFamily: Typography.body,
       fontSize: 16,
       color: colors.onSurface,
@@ -768,7 +894,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: Spacing.xxxl,
+      paddingHorizontal: Math.max(layout.screenPadding * 2, Spacing.xxxl),
       gap: Spacing.md,
     },
     stateIcon: {
@@ -796,10 +922,15 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       fontWeight: '700',
       color: colors.primary,
     },
-    bottomBar: {
+    bottomBarContainer: {
       position: 'absolute',
-      left: 14,
-      right: 14,
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+    },
+    bottomBar: {
+      width: '100%',
+      maxWidth: layout.isTablet ? 760 : undefined,
       flexDirection: 'row',
       alignItems: 'flex-end',
       justifyContent: 'space-between',

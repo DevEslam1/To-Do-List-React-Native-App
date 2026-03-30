@@ -5,6 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Task } from '../store/tasksSlice';
 import { Radii, Spacing, ThemeColors, Typography } from '../constants/theme';
+import { ResponsiveLayout, useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { useAppTheme } from '../providers/theme-provider';
 import {
   formatDuration,
@@ -20,8 +21,9 @@ interface FocusModeModalProps {
 }
 
 export default function FocusModeModal({ visible, task, onClose }: FocusModeModalProps) {
+  const layout = useResponsiveLayout();
   const { colors, isDark } = useAppTheme();
-  const styles = createStyles(colors, isDark);
+  const styles = createStyles(colors, isDark, layout);
   const totalSeconds = useMemo(() => (task ? task.durationMinutes * 60 : 0), [task]);
   const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds);
   const [isRunning, setIsRunning] = useState(false);
@@ -150,16 +152,19 @@ export default function FocusModeModal({ visible, task, onClose }: FocusModeModa
   );
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) =>
+const createStyles = (colors: ThemeColors, isDark: boolean, layout: ResponsiveLayout) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
       backgroundColor: colors.overlay,
       justifyContent: 'center',
-      paddingHorizontal: Spacing.xl,
+      paddingHorizontal: layout.screenPadding,
+      paddingVertical: layout.isTablet ? Spacing.xl : Spacing.lg,
     },
     sheet: {
-      borderRadius: 32,
+      alignSelf: 'center',
+      width: layout.isTablet ? layout.dialogWidth : '100%',
+      borderRadius: layout.isTablet ? 36 : 32,
       padding: Spacing.xl,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 22 },
@@ -211,8 +216,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     timerText: {
       marginTop: 24,
       fontFamily: Typography.headline,
-      fontSize: 72,
-      lineHeight: 78,
+      fontSize: layout.isWideTablet ? 88 : layout.isTablet ? 80 : 72,
+      lineHeight: layout.isWideTablet ? 94 : layout.isTablet ? 84 : 78,
       color: colors.onPrimary,
       letterSpacing: -3,
     },
@@ -258,11 +263,13 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     actions: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: Spacing.md,
       marginTop: Spacing.xl,
     },
     secondaryAction: {
       flex: 1,
+      minWidth: layout.isTablet ? 180 : 0,
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: Spacing.md,
@@ -279,6 +286,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     primaryAction: {
       flex: 1,
+      minWidth: layout.isTablet ? 180 : 0,
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: Spacing.md,

@@ -15,6 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Task } from '../store/tasksSlice';
 import { Radii, Spacing, ThemeColors, Typography } from '../constants/theme';
+import { ResponsiveLayout, useResponsiveLayout } from '../hooks/use-responsive-layout';
 import { useAppTheme } from '../providers/theme-provider';
 import {
   buildDefaultSchedule,
@@ -33,8 +34,9 @@ interface TaskModalProps {
 const durationPresets = [25, 45, 60, 90];
 
 export default function TaskModal({ visible, onClose, onSave, task }: TaskModalProps) {
+  const layout = useResponsiveLayout();
   const { colors, isDark } = useAppTheme();
-  const styles = createStyles(colors, isDark);
+  const styles = createStyles(colors, isDark, layout);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tag, setTag] = useState('Work');
@@ -96,7 +98,12 @@ export default function TaskModal({ visible, onClose, onSave, task }: TaskModalP
   const categories = ['Work', 'Personal', 'Design', 'Admin'];
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType={layout.isTablet ? 'fade' : 'slide'}
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.overlay}
@@ -109,7 +116,12 @@ export default function TaskModal({ visible, onClose, onSave, task }: TaskModalP
             </Pressable>
           </View>
 
-          <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: Spacing.xxl }}>
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={{ paddingBottom: Spacing.xxl }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             <TextInput
               style={styles.inputTitle}
               placeholder="Task title..."
@@ -275,18 +287,23 @@ export default function TaskModal({ visible, onClose, onSave, task }: TaskModalP
   );
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) =>
+const createStyles = (colors: ThemeColors, isDark: boolean, layout: ResponsiveLayout) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
       backgroundColor: colors.overlay,
-      justifyContent: 'flex-end',
+      justifyContent: layout.isTablet ? 'center' : 'flex-end',
+      paddingHorizontal: layout.isTablet ? layout.screenPadding : 0,
+      paddingVertical: layout.isTablet ? Spacing.xl : 0,
     },
     surface: {
+      alignSelf: 'center',
+      width: layout.isTablet ? layout.dialogWidth : '100%',
       backgroundColor: colors.surfaceContainerLow,
-      borderTopLeftRadius: Radii.xl,
-      borderTopRightRadius: Radii.xl,
-      maxHeight: '90%',
+      borderRadius: layout.isTablet ? 28 : 0,
+      borderTopLeftRadius: layout.isTablet ? 28 : Radii.xl,
+      borderTopRightRadius: layout.isTablet ? 28 : Radii.xl,
+      maxHeight: layout.isTablet ? Math.min(layout.height - Spacing.xxxl, 760) : layout.height * 0.9,
       padding: Spacing.xl,
       borderWidth: isDark ? 0 : 1,
       borderColor: colors.outlineVariant,
@@ -474,6 +491,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       marginTop: Spacing.sm,
     },
     btn: {
+      minWidth: layout.isTablet ? 128 : 0,
       paddingHorizontal: Spacing.xl,
       paddingVertical: Spacing.md,
       borderRadius: Radii.pill,
